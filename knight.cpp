@@ -13,12 +13,12 @@ struct Position {
      int x, y;   
 };
 
-Position operator+(const Position& p1, const Position p2) {
+Position operator+(const Position& p1, const Position& p2) {
      Position p{p1.x+p2.x, p1.y+p2.y};
      return p;
 }
 
-Position operator-(const Position& p1, const Position p2) {
+Position operator-(const Position& p1, const Position& p2) {
      Position p{p1.x-p2.x, p1.y-p2.y};
      return p;
 }
@@ -124,12 +124,8 @@ vector<Position> findPath(const Position start, const Position end, int N) {
      
 }
 
-  
- 
- 
 
 // level 3
- 
 
 struct node{
     
