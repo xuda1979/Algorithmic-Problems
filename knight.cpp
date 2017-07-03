@@ -28,7 +28,7 @@ bool operator==(const Position& a, const Position& b)
      return a.x == b.x && a.y == b.y;
 }
      
-void print(Position pos) {
+void print(const Position& pos) {
      cout<<"{"<<pos.x<<","<<pos.y<<"} ";
 }     
 // all possible moves that knight can take
@@ -43,7 +43,7 @@ bool isInside(int x, int y, int N)
      return false;
 }
 
-bool isInside(Position pos, int N)
+bool isInside(const Position& pos, int N)
 {
      if (pos.x >= 0 && pos.x < N && pos.y >= 0 && pos.y < N)
          return true;
@@ -53,7 +53,7 @@ bool isInside(Position pos, int N)
 //level 1
 
 // The sequence is the sequence of the positions of the knight
-bool isSeqValid(const vector<Position> moveSequence, int N) {
+bool isSeqValid(const vector<Position>& moveSequence, int N) {
      int len =(int)  moveSequence.size();
      for(int i = 0; i<len; i++) {
          if( moveSequence[i].x <0 || moveSequence[i].x >=N
@@ -88,40 +88,39 @@ void printCurrentPosition(const Position& currentPosition, int N)
 }   
 
 // level 2
-vector<Position> findPath(const Position start, const Position end, int N) {
-     static int findPathTour[32][32] = {0};
+vector<Position> findPath(const Position& start, const Position& end, int N) {
+     // static 2d array to record if a position has been visited or not
+     static int findPathTour[32][32] = {{0}};
      vector<Position> v;
      if(!isInside(start,N) || !isInside(end,N)) {
          cout<<"start or end position is out of the board!"<<endl;
          return v;
      }
-     v.push_back(start);
-     // declare an array to record
+     v.push_back(move(start));
   
      findPathTour[start.x][start.y] =1;
-     Position t = v.back();
      
-     if(t == end)
+     if(v.back() == end)
          return v;
      
      for(int i = 0; i<8; i++){
          
-         Position next = t+move_KT[i];
+         Position next = v.back()+move_KT[i];
          if(isInside(next,N))
          {
              if(findPathTour[next.x][next.y] == 0){    
                  findPathTour[next.x][next.y] = 1;      
                  vector<Position> v1 = findPath(next, end, N);
-                 vector<Position> vv1;
-                 vv1.reserve( v.size() + v1.size()); // preallocate memory
-                 vv1.insert(vv1.end(), v.begin(), v.end() );
-                 vv1.insert(vv1.end(), v1.begin(), v1.end() );
-                 return vv1;                    
+                 if(v1.back() == end) {
+                     int s = v.size();
+                     v.reserve(s+v1.size()); // preallocate memory
+                     v.insert(v.end(),v1.begin(), v1.end());
+                     return v;
+                 }
              }
           }
          
      }
-     
 }
 
 
@@ -129,13 +128,12 @@ vector<Position> findPath(const Position start, const Position end, int N) {
 
 struct node{
     
-     node(Position pos, node* par) {
-         current = pos;
-         
+     node(const Position& pos,  node* const par) {
+         current = pos;       
          parent = par;
          if(parent !=nullptr && parent->path.size()>0)
              path = parent->path;
-         path.push_back(pos);
+         path.push_back(move(pos));
          
      }
      
@@ -172,33 +170,30 @@ void print(const vector<vector<Position>>& v, int less) {
 // If N= 8, it is pretty fast but it is very slow when N= 32. Therefore for large N,
 // we will use another method to simulate paths, which is "Monte Carlo Tree Search"
 
-node* searchTreeShortest(Position start, Position end, node* parent, int N) {
-     static int shortest = N*N;
+node* searchTreeShortest(const Position& start, const Position& end, node* parent, const int N) {
+     static int shortest = 2*N;
      if(!isInside(start,N) || !isInside(end,N)) {
          cout<<"start or end position is out of the board!"<<endl;
          return nullptr;
      }
      node* root = new node(start, parent);
-     // declare an array to record
- 
      
      if(start == end) {
          if(shortest >= (int) root->path.size()-1)
              shortest = (int)root->path.size()-1;
          return root;
      }
-     if(root->path.size()-1 <= shortest){
-         for(int i = 0; i<8; i++){
-         
+     
+     // we only continue the next step of the path if its current length is smaller
+     // than shortest 
+     if(root->path.size()-1 < shortest){
+         for(int i = 0; i<8; i++) {
              Position next = root->current+move_KT[i];
-             if(isInside(next,N))
-             {
-                 if( find(root->path.begin(),root->path.end(), next) ==
-                         root->path.end()) {    
-                       
-                     root->nextMoves.insert(searchTreeShortest(next, end, root, N));           
-                 }
+             if(isInside(next,N) &&
+                find(root->path.begin(),root->path.end(), next) == root->path.end()) {                       
+                     root->nextMoves.insert(searchTreeShortest(next, end, root, N));                                      
              }        
+             
          }
      } 
      
@@ -206,18 +201,18 @@ node* searchTreeShortest(Position start, Position end, node* parent, int N) {
 }
 
 // this function is to get all the paths from the search tree
-vector<vector<Position>>  getAllPaths(node* root) {
+vector<vector<Position>>  getAllPaths(node* root, const Position& end) {
      vector<vector<Position>> allPaths;
-     if(root->nextMoves.size() == 0)
+     if(root->nextMoves.size() == 0 && root->current == end)
      {     
-         allPaths.push_back(root->path);
+         allPaths.push_back(move(root->path));
          return allPaths;
      }
      
-     for(auto p : root->nextMoves) {
-         vector<vector<Position>> subAllPaths = getAllPaths(p);
-         for(auto path: subAllPaths) {         
-             allPaths.push_back(path);
+     for(auto& p : root->nextMoves) {
+         vector<vector<Position>> subAllPaths = getAllPaths(p,end);
+         for(auto& path: subAllPaths) {         
+             allPaths.push_back(move(path));
          }    
      }
      
@@ -225,7 +220,7 @@ vector<vector<Position>>  getAllPaths(node* root) {
 }
 
 // this function is to computed exactly all the shortest paths
-vector<vector<Position>> shortestPaths(const vector<vector<Position>> allPaths, const Position& start, const Position& end, int N) {
+vector<vector<Position>> shortestPaths(const vector<vector<Position>>& allPaths, const Position& start, const Position& end, const int N) {
      int shortest = N*N;
      for(int i = 0; i< allPaths.size(); i++) {
          if((int)allPaths[i].size()-1 <= shortest
@@ -236,11 +231,11 @@ vector<vector<Position>> shortestPaths(const vector<vector<Position>> allPaths, 
      }
  
      vector<vector<Position>> shortPaths;
-     for(auto path:allPaths)
+     for(auto& path:allPaths)
          if((path.size()-1) == shortest
              && path[0]== start
              && path.back()== end)
-             shortPaths.push_back(path);
+             shortPaths.push_back(move(path));
      
      return shortPaths;    
 }
@@ -255,7 +250,7 @@ vector<vector<Position>> shortestPaths(const vector<vector<Position>> allPaths, 
 
 // initialize a weight matrix with all ones( the trivial case). Then we can change
 // the value to anyvalue
-int weightedLength(vector<Position> path, const vector<vector<int>> weight) {
+int weightedLength(const vector<Position>& path, const vector<vector<int>>& weight) {
      int s = 0;
      for(int i =1; i< path.size(); i++) {
          if(weight[path[i].x][path[i].y] != -1)
@@ -272,11 +267,11 @@ int weightedLength(vector<Position> path, const vector<vector<int>> weight) {
 // of the board. So we can define a weight on the board and compute the weighted 
 // lenght of each path.
 
-vector<vector<Position>> weightedShortestPaths(const vector<vector<Position>> allPaths, 
-                                                const Position& start,
-                                                const Position& end, 
-                                                int N,
-                                                vector<vector<int>> weight) {
+vector<vector<Position>> weightedShortestPaths(const vector<vector<Position>>& allPaths, 
+                                               const Position& start,
+                                               const Position& end, 
+                                               const int N,
+                                               const vector<vector<int>>& weight) {
      int shortest = 5*N*N;
      for(int i = 0; i< allPaths.size(); i++) {
          if( weightedLength(allPaths[i],weight)<= shortest
@@ -288,22 +283,22 @@ vector<vector<Position>> weightedShortestPaths(const vector<vector<Position>> al
      }
  
      vector<vector<Position>> shortPaths;
-     for(auto path:allPaths)
+     for(auto& path:allPaths)
          if( weightedLength(path,weight) == shortest
              && path[0]== start
              && path.back()== end)
-             shortPaths.push_back(path);
+             shortPaths.push_back(move(path));
      
      return shortPaths;    
 }
 
 // this function is to use Monte Carlo Tree Search to simulate the paths and 
 // find the best effort solution
-vector<Position> randomWalkWeightedShortestPath(const Position start, 
-                                                 const Position end,
-                                                 int N , 
-                                                 int limit, 
-                                                 vector<vector<int>>& weight){
+vector<Position> randomWalkWeightedShortestPath(const Position& start, 
+                                                const Position& end,
+                                                const int N , 
+                                                const int limit, 
+                                                const vector<vector<int>>& weight){
      int tour[N][N] = {0};
      vector<Position> v;
      bool found = false;
@@ -322,7 +317,7 @@ vector<Position> randomWalkWeightedShortestPath(const Position start,
 
          vector<Position> vv;
          tour[start.x][start.y] = 1;
-         vv.push_back(start);
+         vv.push_back(move(start));
          while(find(vv.begin(), vv.end(),end) == vv.end()) {
              bool moveable = false;
              Position next;
@@ -338,7 +333,7 @@ vector<Position> randomWalkWeightedShortestPath(const Position start,
              next = vv.back()+move_KT[r];
              if(isInside(next,N) && tour[next.x][next.y] ==0){
                  tour[next.x][next.y] = 1;
-                 vv.push_back(next);
+                 vv.push_back(move(next));
              }
 
              if(weightedLength(vv,weight) >shortest)
@@ -362,7 +357,7 @@ vector<Position> randomWalkWeightedShortestPath(const Position start,
 // We use Monte Carlo Tree Search for this problem. We simulate each step untill arrive at the destination.
 // There is no duplicat step in a path.
 
-vector<Position> randomWalkLongestPath(const Position start, const Position end, int N , int limit=10000)
+vector<Position> randomWalkLongestPath(const Position& start, const Position& end, const int N , const int limit=10000)
 {
      int tour[N][N] = {0};
      vector<Position> v;
@@ -372,7 +367,7 @@ vector<Position> randomWalkLongestPath(const Position start, const Position end,
          return v;
      }
 
-     int longest = 0;//N*N-1- abs(start.x+start.y-end.x-end.y)%2;
+     int longest = 0;
 
      for(int i=0; i<limit; i++) {
 
@@ -382,7 +377,7 @@ vector<Position> randomWalkLongestPath(const Position start, const Position end,
 
          vector<Position> vv;
          tour[start.x][start.y] = 1;
-         vv.push_back(start);
+         vv.push_back(move(start));
          while(find(vv.begin(), vv.end(),end) == vv.end()) {
              bool moveable = false;
              Position next;
@@ -398,11 +393,9 @@ vector<Position> randomWalkLongestPath(const Position start, const Position end,
              next = vv.back()+move_KT[r];
              if(isInside(next,N) && tour[next.x][next.y] ==0){
                  tour[next.x][next.y] = 1;
-                 vv.push_back(next);
+                 vv.push_back(move(next));
              }
-     //        print(vv);       
          }
-         //print(vv);
          if((vv.size()-1) >=longest && vv.back()==end)
          {  
              v = vv;
@@ -411,13 +404,12 @@ vector<Position> randomWalkLongestPath(const Position start, const Position end,
          }
         
      }
-    // cout<<"tried "<<limit<<" paths and not found length "<<longest<<endl;
      return v;
-
 }
 
 int main() {
-     
+    // the scale of the board
+    int N = 8;
     //level 1 test
     cout<<"level 1 test result:"<<endl;
     vector<Position> s1 = {{1,1}, {3,2}, {5,3},{6,1},{4,0},{2,1}};
@@ -446,6 +438,8 @@ int main() {
     
     
     // level 2
+    // we set the board sacle to be 32x32 for this problem.
+    N = 32;
     cout<<"level 2 test result:"<<endl;
     Position start = {0,0};
     Position end = {7,7};
@@ -453,20 +447,18 @@ int main() {
     print(start);
     cout<<" to ";
     print(end);
+    cout<<" in a "<<N<<"x"<<N<<" board";
     cout<<endl;
-    vector<Position> path = findPath(start,end, 8);
+    vector<Position> path = findPath(start,end, N);
     print(path);  
     cout<<endl<<endl;
     
     //level 3
-    cout<<"level 3 test result:"<<endl;
-    
-    node* root = searchTreeShortest(start, end,nullptr, 8);
-    
-    vector<vector<Position>>  allPaths = getAllPaths(root); 
- 
+    N = 8;
+    cout<<"level 3 test result:"<<endl;   
+    node* root = searchTreeShortest(start, end, nullptr, N); 
+    vector<vector<Position>>  allPaths = getAllPaths(root, end); 
     cout<<endl;
-  
     vector<vector<Position>> vv = shortestPaths(allPaths,start,end, 8);
     cout<<"We use search tree to get optimal solution for this problem the optimal solution can be"<<endl;
     cout<<"computed for N=8"<<endl;  
@@ -479,9 +471,10 @@ int main() {
     cout<<"(only show 10 of all the shortest paths)"<<endl;
     print(vv,10);
     cout<<endl<<endl;
+    
     //level 4
     end = {31,31}; // now end position is at the corner of the board
-    int N = 32;
+    N = 32;
     int n_samples = 1000;
     vector<vector<int>> weight(N, vector<int>(N,1));
     cout<<"level 4 test result:"<<endl;
@@ -506,6 +499,7 @@ int main() {
     cout<<endl<<endl;
 
     //level 5
+    N = 32;
     n_samples = 1000; // number of the samples which can be increased if computing resources are adequate
     cout<<"level 5 test result:"<<endl;
     cout<<"Longest paths in a 32x32 board from ";
@@ -514,7 +508,7 @@ int main() {
     print(end);
     cout<<"Using random walk from "<<n_samples<<" sample paths"<<endl;
     cout<<"Using random walk "<<n_samples<<" sample paths"<<endl;
-    vector<Position> vrandom = randomWalkLongestPath(start,end, 32, n_samples);
+    vector<Position> vrandom = randomWalkLongestPath(start,end, N, n_samples);
     if(!vrandom.empty())
         cout<<"Total number of steps "<<vrandom.size()-1<<endl;
     print(vrandom);
