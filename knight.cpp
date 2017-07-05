@@ -4,6 +4,7 @@
 #include <iostream>
 #include <vector>
 #include <set>
+#include <stack>
 #include <algorithm>
 #include <stdlib.h>
 using namespace std;
@@ -126,21 +127,21 @@ vector<Position> findPath(const Position& start, const Position& end, int N) {
 
 // level 3
 
-struct node{
+struct Node{
     
-     node(const Position& pos,  node* const par) {
+     Node(const Position& pos,  Node* par) {
          current = pos;       
          parent = par;
          if(parent !=nullptr && parent->path.size()>0)
              path = parent->path;
-         path.push_back(move(pos));
+         path.push_back(pos);
          
      }
      
      Position current;
      vector<Position> path;
-     node* parent;
-     set<node*> nextMoves;
+     Node* parent;
+     set<Node*> nextMoves;
         
 };
 
@@ -169,14 +170,17 @@ void print(const vector<vector<Position>>& v, int less) {
 // the following function construct a search tree which will give the optimal solution
 // If N= 8, it is pretty fast but it is very slow when N= 32. Therefore for large N,
 // we will use another method to simulate paths, which is "Monte Carlo Tree Search"
+// we also write a iterative search tree which is much better but still slow for long
+// distance points and large N. It seems the working method in practice should be
+// Monte Carlo Tree Search
 
-node* searchTreeShortest(const Position& start, const Position& end, node* parent, const int N) {
+Node* searchTreeShortest(const Position& start, const Position& end, Node* parent, int N) {
      static int shortest = 2*N;
      if(!isInside(start,N) || !isInside(end,N)) {
          cout<<"start or end position is out of the board!"<<endl;
          return nullptr;
      }
-     node* root = new node(start, parent);
+     Node* root = new Node(start, parent);
      
      if(start == end) {
          if(shortest >= (int) root->path.size()-1)
@@ -200,8 +204,56 @@ node* searchTreeShortest(const Position& start, const Position& end, node* paren
      return root;    
 }
 
+// this searchTree is to use iteration method. The space complexity is much smaller than the recursive version above
+// we use limit to denote the numbers of the paths we want to collet. If limit is set to 0, the result will include
+// all shortest paths and will be time consuming when N is large. 
+
+vector<vector<Position>> searchTreeShortestIteration(const Position& start, 
+                                                     const Position& end, 
+                                                     Node* parent, 
+                                                     int N, 
+                                                     int limit = 0) {
+
+     int shortest = max(abs(start.x-end.x) ,abs(start.y-end.y));
+     vector<vector<Position>> result;
+     if(!isInside(start,N) || !isInside(end,N)) {
+         cout<<"start or end position is out of the board!"<<endl;
+         return result;
+     }
+     stack<Node> s;
+    
+     Node node(start, parent);
+     s.push(node);
+     
+     while(!s.empty()){
+         Node p = s.top();
+         s.pop();
+         
+         if(p.current == end && p.path.size()-1 <=shortest){
+             shortest = p.path.size()-1;
+             result.push_back(p.path); 
+             if(limit>0 && result.size() >=limit)
+                 return result;           
+         }
+         
+         if(!(p.current ==end) && p.path.size()-1 < shortest){
+             for(int i = 0; i<8; i++) {
+                 Position next = p.current+move_KT[i];
+                 if(isInside(next,N) &&
+                    find(p.path.begin(),p.path.end(), next) == p.path.end()) {                       
+                     Node node(next, &p);
+                     s.push(node);                                       
+                 }        
+             
+              }
+         }
+     } 
+         return result;
+}
+
+
 // this function is to get all the paths from the search tree
-vector<vector<Position>>  getAllPaths(node* root, const Position& end) {
+vector<vector<Position>>  getAllPaths(Node* root, const Position& end) {
      vector<vector<Position>> allPaths;
      if(root->nextMoves.size() == 0 && root->current == end)
      {     
@@ -220,7 +272,7 @@ vector<vector<Position>>  getAllPaths(node* root, const Position& end) {
 }
 
 // this function is to computed exactly all the shortest paths
-vector<vector<Position>> shortestPaths(const vector<vector<Position>>& allPaths, const Position& start, const Position& end, const int N) {
+vector<vector<Position>> shortestPaths(const vector<vector<Position>>& allPaths, const Position& start, const Position& end, int N) {
      int shortest = N*N;
      for(int i = 0; i< allPaths.size(); i++) {
          if((int)allPaths[i].size()-1 <= shortest
@@ -270,7 +322,7 @@ int weightedLength(const vector<Position>& path, const vector<vector<int>>& weig
 vector<vector<Position>> weightedShortestPaths(const vector<vector<Position>>& allPaths, 
                                                const Position& start,
                                                const Position& end, 
-                                               const int N,
+                                               int N,
                                                const vector<vector<int>>& weight) {
      int shortest = 5*N*N;
      for(int i = 0; i< allPaths.size(); i++) {
@@ -296,8 +348,8 @@ vector<vector<Position>> weightedShortestPaths(const vector<vector<Position>>& a
 // find the best effort solution
 vector<Position> randomWalkWeightedShortestPath(const Position& start, 
                                                 const Position& end,
-                                                const int N , 
-                                                const int limit, 
+                                                int N , 
+                                                int limit, 
                                                 const vector<vector<int>>& weight){
      int tour[N][N] = {0};
      vector<Position> v;
@@ -357,7 +409,7 @@ vector<Position> randomWalkWeightedShortestPath(const Position& start,
 // We use Monte Carlo Tree Search for this problem. We simulate each step untill arrive at the destination.
 // There is no duplicat step in a path.
 
-vector<Position> randomWalkLongestPath(const Position& start, const Position& end, const int N , const int limit=10000)
+vector<Position> randomWalkLongestPath(const Position& start, const Position& end, int N, int limit=10000)
 {
      int tour[N][N] = {0};
      vector<Position> v;
@@ -454,15 +506,22 @@ int main() {
     cout<<endl<<endl;
     
     //level 3
-    N = 8;
+    N = 32;
+    end= {10,10};
     cout<<"level 3 test result:"<<endl;   
-    node* root = searchTreeShortest(start, end, nullptr, N); 
-    vector<vector<Position>>  allPaths = getAllPaths(root, end); 
+    
+    // The following three lines is to use recursive search tree which is memory consuming.
+    // Node* root = searchTreeShortest(start, end, nullptr, N); 
+    // vector<vector<Position>>  allPaths = getAllPaths(root, end);    
+    // Node* root = searchTreeShortest(start, end, nullptr, N); 
+   
+    // we use iterative search tree. My computer feels much relaxed.
+    vector<vector<Position>>  allPaths = searchTreeShortestIteration(start, end , nullptr, N); 
     cout<<endl;
-    vector<vector<Position>> vv = shortestPaths(allPaths,start,end, 8);
-    cout<<"We use search tree to get optimal solution for this problem the optimal solution can be"<<endl;
-    cout<<"computed for N=8"<<endl;  
-    cout<<"Shortest paths in a 8x8 board from ";
+    vector<vector<Position>> vv = shortestPaths(allPaths,start,end, N);
+    cout<<"We use iterative search tree to get optimal solution for this problem the optimal solution can be"<<endl;
+    cout<<"computed for N = "<<N<<endl;  
+    cout<<"Shortest paths in a "<<N<<"x"<<N<<" board from ";
     print(start);
     cout<<" to ";
     print(end);
