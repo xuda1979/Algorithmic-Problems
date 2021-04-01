@@ -3,6 +3,8 @@
 #include<iostream>
 #include <list>
 #include <stack>
+#include <vector>
+#include <memory>
 #define NIL -1
 using namespace std;
   
@@ -10,11 +12,11 @@ using namespace std;
 class Graph
 {
     int V;    // No. of vertices
-    list<int> *adj;    // A dynamic array of adjacency lists
+    vector<list<int>> adj;    // A dynamic array of adjacency lists
   
     // A Recursive DFS based function used by SCC()
-    void SCCUtil(int u, int disc[], int low[],
-                 stack<int> *st, bool stackMember[]);
+    void SCCUtil(int u, vector<int>& disc, vector<int>& low,
+                 shared_ptr<stack<int>> st, vector<bool>& stackMember);
 public:
     Graph(int V);   // Constructor
     void addEdge(int v, int w);   // function to add an edge to graph
@@ -24,7 +26,7 @@ public:
 Graph::Graph(int V)
 {
     this->V = V;
-    adj = new list<int>[V];
+    adj = vector<list<int>>(V);
 }
   
 void Graph::addEdge(int v, int w)
@@ -43,8 +45,8 @@ void Graph::addEdge(int v, int w)
 //           of SCC)
 // stackMember[] --> bit/index array for faster check whether
 //                  a node is in stack
-void Graph::SCCUtil(int u, int disc[], int low[], stack<int> *st,
-                    bool stackMember[])
+void Graph::SCCUtil(int u, vector<int>& disc, vector<int>& low, shared_ptr<stack<int>> st,
+                    vector<bool>& stackMember)
 {
     // A static variable is used for simplicity, we can avoid use
     // of static variable by passing a pointer.
@@ -56,8 +58,7 @@ void Graph::SCCUtil(int u, int disc[], int low[], stack<int> *st,
     stackMember[u] = true;
   
     // Go through all vertices adjacent to this
-    list<int>::iterator i;
-    for (i = adj[u].begin(); i != adj[u].end(); ++i)
+    for (auto i = adj[u].begin(); i != adj[u].end(); ++i)
     {
         int v = *i;  // v is current adjacent of 'u'
   
@@ -100,10 +101,10 @@ void Graph::SCCUtil(int u, int disc[], int low[], stack<int> *st,
 // The function to do DFS traversal. It uses SCCUtil()
 void Graph::SCC()
 {
-    int *disc = new int[V];
-    int *low = new int[V];
-    bool *stackMember = new bool[V];
-    stack<int> *st = new stack<int>();
+    vector<int> disc(V);
+    vector<int> low(V);
+    vector<bool> stackMember(V);
+    shared_ptr<stack<int>> st(new stack<int>());
   
     // Initialize disc and low, and stackMember arrays
     for (int i = 0; i < V; i++)
