@@ -68,7 +68,7 @@ void Graph::addEdge(int v, int w)
     adj[v].push_back(w); // Add w to v’s list.
 }
   
-void Graph::fillOrder(int v, vector<bool>& visited, stack<int> &Stack)
+void Graph::fillOrder(int v, vector<bool>& visited, stack<int>& Stack)
 {
     // Mark the current node as visited and print it
     visited[v] = true;

@@ -4,7 +4,7 @@
 #include <list>
 #include <stack>
 #include <vector>
-#include <memory>
+#include <cstdlib>
 #define NIL -1
 using namespace std;
   
@@ -16,11 +16,13 @@ class Graph
   
     // A Recursive DFS based function used by SCC()
     void SCCUtil(int u, vector<int>& disc, vector<int>& low,
-                 shared_ptr<stack<int>> st, vector<bool>& stackMember);
+                 stack<int>& st, vector<bool>& stackMember, bool tradition);
 public:
     Graph(int V);   // Constructor
+    vector<int> sequence;
     void addEdge(int v, int w);   // function to add an edge to graph
-    void SCC();    // prints strongly connected components
+    void addEdge(const vector<vector<int>>& edges);
+    void SCC(bool tradition=true);    // prints strongly connected components
 };
   
 Graph::Graph(int V)
@@ -33,7 +35,21 @@ void Graph::addEdge(int v, int w)
 {
     adj[v].push_back(w);
 }
-  
+
+void Graph::addEdge(const vector<vector<int>>& edges) 
+{
+    auto s = edges.size();
+    for(auto i=0;i<s; i++) {
+        for(auto j=0; j<s; j++){
+            if(edges[i][j]>0) {
+                adj[i].push_back(j);
+            }
+        }
+    }
+
+
+}
+ 
 // A recursive function that finds and prints strongly connected
 // components using DFS traversal
 // u --> The vertex to be visited next
@@ -41,12 +57,11 @@ void Graph::addEdge(int v, int w)
 // low[] -- >> earliest visited vertex (the vertex with minimum
 //             discovery time) that can be reached from subtree
 //             rooted with current vertex
-// *st -- >> To store all the connected ancestors (could be part
+// st -- >> To store all the connected ancestors (could be part
 //           of SCC)
 // stackMember[] --> bit/index array for faster check whether
 //                  a node is in stack
-void Graph::SCCUtil(int u, vector<int>& disc, vector<int>& low, shared_ptr<stack<int>> st,
-                    vector<bool>& stackMember)
+void Graph::SCCUtil(int u, vector<int>& disc, vector<int>& low, stack<int>& st, vector<bool>& stackMember, bool tradition)
 {
     // A static variable is used for simplicity, we can avoid use
     // of static variable by passing a pointer.
@@ -54,18 +69,16 @@ void Graph::SCCUtil(int u, vector<int>& disc, vector<int>& low, shared_ptr<stack
   
     // Initialize discovery time and low value
     disc[u] = low[u] = ++time;
-    st->push(u);
+    st.push(u);
     stackMember[u] = true;
   
     // Go through all vertices adjacent to this
-    for (auto i = adj[u].begin(); i != adj[u].end(); ++i)
+    for (const auto& v: adj[u])
     {
-        int v = *i;  // v is current adjacent of 'u'
-  
         // If v is not visited yet, then recur for it
         if (disc[v] == -1)
         {
-            SCCUtil(v, disc, low, st, stackMember);
+            SCCUtil(v, disc, low, st, stackMember, tradition);
   
             // Check if the subtree rooted with 'v' has a
             // connection to one of the ancestors of 'u'
@@ -76,35 +89,42 @@ void Graph::SCCUtil(int u, vector<int>& disc, vector<int>& low, shared_ptr<stack
         // Update low value of 'u' only of 'v' is still in stack
         // (i.e. it's a back edge, not cross edge).
         // Case 2 (per above discussion on Disc and Low value)
-        else if (stackMember[v] == true)
-            low[u]  = min(low[u], disc[v]);
+
+       else if (stackMember[v]){
+            if (tradition)
+               low[u]  = min(low[u], disc[v]);
+            else
+               low[u] = min(low[u], low[v]);
+        }
     }
   
     // head node found, pop the stack and print an SCC
     int w = 0;  // To store stack extracted vertices
     if (low[u] == disc[u])
     {
-        while (st->top() != u)
+        while (st.top() != u)
         {
-            w = (int) st->top();
+            w = (int) st.top();
             cout << w << " ";
+            sequence.push_back(w);
             stackMember[w] = false;
-            st->pop();
+            st.pop();
         }
-        w = (int) st->top();
+        w = (int) st.top();
         cout << w << "\n";
+        sequence.push_back(w);
         stackMember[w] = false;
-        st->pop();
+        st.pop();
     }
 }
   
 // The function to do DFS traversal. It uses SCCUtil()
-void Graph::SCC()
+void Graph::SCC(bool tradition)
 {
     vector<int> disc(V);
     vector<int> low(V);
     vector<bool> stackMember(V);
-    shared_ptr<stack<int>> st(new stack<int>());
+    stack<int> st;
   
     // Initialize disc and low, and stackMember arrays
     for (int i = 0; i < V; i++)
@@ -118,12 +138,13 @@ void Graph::SCC()
     // connected components in DFS tree with vertex 'i'
     for (int i = 0; i < V; i++)
         if (disc[i] == NIL)
-            SCCUtil(i, disc, low, st, stackMember);
+            SCCUtil(i, disc, low, st, stackMember, tradition);
 }
   
 // Driver program to test above function
 int main()
 {
+   
     cout << "\nSCCs in first graph \n";
     Graph g1(5);
     g1.addEdge(1, 0);
@@ -174,7 +195,38 @@ int main()
     g5.addEdge(2,4);
     g5.addEdge(3,0);
     g5.addEdge(4,2);
-    g5.SCC();
-  
+    g5.SCC(false);
+   
+    cout <<"\nSCCs in the final randomly generated graph\n";
+    int n = 20;  
+    auto trial =0;
+    int not_equal = 0;
+    while(trial < 1000) {
+        Graph g(n);
+        vector<vector<int>> edges(n,vector<int>(n,0));
+        for(auto i =0;i<n;i++)
+            for(auto j=i+1; j<n;j++){
+                int r = rand()%10;
+                int r2 = rand()%2;
+                if (r<=2 and r2==0)
+                    edges[i][j] = 1;
+                if(r<=2 and r2==1)
+                    edges[j][i] = 1;
+ //           cout<<"edges "<<i<<' '<<j<< ' '<< edges[i][j]<<endl;
+            }
+        g.addEdge(edges);
+        cout<<"\n\n begin\n";
+        cout<<"tradition\n";
+        g.SCC(true);
+        cout<<"new\n";
+        auto s1 = g.sequence;
+        g.sequence.clear();
+        g.SCC(false);
+        cout<<"end\n";
+        if(s1 !=g.sequence)
+            not_equal++;
+        trial++;
+    } 
+    cout<<"The number of SCCs not same using tradition and new method is "<< not_equal<<'\n';     
     return 0;
 }
